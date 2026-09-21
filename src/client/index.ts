@@ -25,6 +25,15 @@ const SETTINGS = {
 /** Painted above the shell background, below the overlay surfaces. */
 const LAYER_Z_INDEX = 1
 
+/** Gaussian blur applied to the painted ribbon, in CSS pixels. */
+const RIBBON_BLUR_PX = 16
+/** Layer opacity after the blur: the ribbon stays a background cue. */
+const LAYER_OPACITY = 0.5
+/** Per-stroke alpha handed to the canvas. */
+const STROKE_ALPHA = 0.02
+/** Canvas backing-store scale; below 1 the browser softens the upscale too. */
+const RENDER_SCALE = 0.6
+
 /** One sine oscillator driving the ribbon hue. */
 class Oscillator {
   private phase: number
@@ -126,9 +135,15 @@ function mountTrails(): () => void {
     pointerEvents: 'none',
     overflow: 'hidden',
     contain: 'strict',
+    opacity: String(LAYER_OPACITY),
   } satisfies Partial<CSSStyleDeclaration>)
   const canvas = document.createElement('canvas')
-  Object.assign(canvas.style, { display: 'block', width: '100%', height: '100%' } satisfies Partial<CSSStyleDeclaration>)
+  Object.assign(canvas.style, {
+    display: 'block',
+    width: '100%',
+    height: '100%',
+    filter: 'blur(' + RIBBON_BLUR_PX + 'px)',
+  } satisfies Partial<CSSStyleDeclaration>)
   layer.appendChild(canvas)
   document.body.appendChild(layer)
 
@@ -155,7 +170,7 @@ function mountTrails(): () => void {
   }
 
   const resize = (): void => {
-    const ratio = Math.min(window.devicePixelRatio || 1, 1.5)
+    const ratio = Math.min(window.devicePixelRatio || 1, 1.5) * RENDER_SCALE
     width = Math.max(1, layer.clientWidth)
     height = Math.max(1, layer.clientHeight)
     canvas.width = Math.round(width * ratio)
@@ -178,7 +193,7 @@ function mountTrails(): () => void {
       const color = baseHue + (trail.indexFraction - 0.5) * 44
       const centerWeight = 1 - Math.abs(trail.indexFraction - 0.5) * 1.2
       context.lineWidth = Math.max(3.5, Math.min(7.5, width / 76)) * (0.82 + centerWeight * 0.26)
-      context.strokeStyle = 'hsla(' + Math.round(color) + ', 72%, 57%, 0.045)'
+      context.strokeStyle = 'hsla(' + Math.round(color) + ', 72%, 57%, ' + STROKE_ALPHA + ')'
       trail.update(target)
       trail.draw(context)
     }
