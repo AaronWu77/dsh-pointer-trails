@@ -26,13 +26,13 @@ const SETTINGS = {
 const LAYER_Z_INDEX = 1
 
 /** Gaussian blur applied to the painted ribbon, in CSS pixels. */
-const RIBBON_BLUR_PX = 16
+const RIBBON_BLUR_PX = 13
 /** Layer opacity after the blur: the ribbon stays a background cue. */
-const LAYER_OPACITY = 0.5
+const LAYER_OPACITY = 0.62
 /** Per-stroke alpha handed to the canvas. */
-const STROKE_ALPHA = 0.02
+const STROKE_ALPHA = 0.027
 /** Canvas backing-store scale; below 1 the browser softens the upscale too. */
-const RENDER_SCALE = 0.6
+const RENDER_SCALE = 0.7
 
 /** One sine oscillator driving the ribbon hue. */
 class Oscillator {
