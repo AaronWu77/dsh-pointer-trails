@@ -1,0 +1,5 @@
+# Bundle patch row: the host half is a plain Cordis plugin (no-op here); the
+# dsh.client declaration makes the web app load ./client as the browser half.
+- insert:
+    - id: dsh-pointer-trails
+      name: dsh-pointer-trails
