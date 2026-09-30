@@ -87,13 +87,13 @@ class Trail {
   /** Advance the strand toward one target point. */
   update(target: { x: number; y: number }): void {
     let spring = this.spring
-    const first = this.nodes[0]!
+    const first = this.nodes[0]
     first.vx += (target.x - first.x) * spring
     first.vy += (target.y - first.y) * spring
     for (let index = 0; index < this.nodes.length; index += 1) {
-      const node = this.nodes[index]!
+      const node = this.nodes[index]
       if (index > 0) {
-        const previous = this.nodes[index - 1]!
+        const previous = this.nodes[index - 1]
         node.vx += (previous.x - node.x) * spring
         node.vy += (previous.y - node.y) * spring
         node.vx += previous.vx * SETTINGS.dampening
@@ -109,16 +109,17 @@ class Trail {
 
   /** Stroke the strand as a quadratic ribbon. */
   draw(context: CanvasRenderingContext2D): void {
-    let current = this.nodes[0]!
+    let current = this.nodes[0]
     context.beginPath()
     context.moveTo(current.x, current.y)
     for (let index = 1; index < this.nodes.length - 2; index += 1) {
-      current = this.nodes[index]!
-      const next = this.nodes[index + 1]!
+      const point = this.nodes[index]
+      const next = this.nodes[index + 1]
+      current = point
       context.quadraticCurveTo(current.x, current.y, (current.x + next.x) * 0.5, (current.y + next.y) * 0.5)
     }
-    const penultimate = this.nodes[this.nodes.length - 2]!
-    const last = this.nodes[this.nodes.length - 1]!
+    const penultimate = this.nodes[this.nodes.length - 2]
+    const last = this.nodes[this.nodes.length - 1]
     context.quadraticCurveTo(penultimate.x, penultimate.y, last.x, last.y)
     context.stroke()
   }
@@ -142,7 +143,7 @@ function mountTrails(): () => void {
     display: 'block',
     width: '100%',
     height: '100%',
-    filter: 'blur(' + RIBBON_BLUR_PX + 'px)',
+    filter: `blur(${RIBBON_BLUR_PX}px)`,
   } satisfies Partial<CSSStyleDeclaration>)
   layer.appendChild(canvas)
   document.body.appendChild(layer)
@@ -193,7 +194,7 @@ function mountTrails(): () => void {
       const color = baseHue + (trail.indexFraction - 0.5) * 44
       const centerWeight = 1 - Math.abs(trail.indexFraction - 0.5) * 1.2
       context.lineWidth = Math.max(3.5, Math.min(7.5, width / 76)) * (0.82 + centerWeight * 0.26)
-      context.strokeStyle = 'hsla(' + Math.round(color) + ', 72%, 57%, ' + STROKE_ALPHA + ')'
+      context.strokeStyle = `hsla(${Math.round(color)}, 72%, 57%, ${STROKE_ALPHA})`
       trail.update(target)
       trail.draw(context)
     }

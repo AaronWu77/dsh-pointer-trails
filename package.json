@@ -53,6 +53,8 @@
     "lightningcss": "1.32.0",
     "@tailwindcss/node": "4.3.3",
     "@tailwindcss/oxide": "4.3.3",
-    "oxlint": "1.82.0"
+    "oxlint": "1.82.0",
+    "@stylistic/eslint-plugin": "^5.10.0",
+    "eslint-plugin-sonarjs": "^4.2.0"
   }
 }
