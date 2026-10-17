@@ -1,0 +1,31 @@
+# Bilingual-pair consistency record for README.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
+#   pnpm run verify-translation-pairing --write README.md
+/:
+  en: f79856767dc60c6a
+  zh: 05c730d91cb12755
+/pointer-trails:
+  en: a0c1690954aa9b49
+  zh: 4bd6a56df1613606
+/pointer-trails/summary:
+  en: e99a8a6ab739ff1e
+  zh: 73864a339b274b83
+/pointer-trails/contents:
+  en: 006a34b1158b00fa
+  zh: 223da7438c5f955c
+/pointer-trails/composition:
+  en: b803b0a7f2795a67
+  zh: 49ab18baadbf577d
+/pointer-trails/motion-and-lifecycle:
+  en: 5a1eda88c9f402c8
+  zh: 968ad26ab711daf0
+/pointer-trails/development:
+  en: 05f371216c72b950
+  zh: 1b59aac85c9f5d7c
+/pointer-trails/model-experience:
+  en: 11a06cf16498880b
+  zh: 649f6476f5e4d04e
+/pointer-trails/known-limitations-and-deferred-work:
+  en: 9cb55fc696c453bd
+  zh: b8a5de69749288f4

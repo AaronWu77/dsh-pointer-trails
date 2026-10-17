@@ -1,10 +1,6 @@
 import { readFileSync } from 'node:fs'
-import { readFile } from 'node:fs/promises'
 import { isBuiltin } from 'node:module'
-import { basename, dirname, join, resolve as resolvePath } from 'node:path'
-import { compile as compileTailwind } from '@tailwindcss/node'
-import { Scanner } from '@tailwindcss/oxide'
-import { transform } from 'lightningcss'
+import { join } from 'node:path'
 import { defineConfig } from 'tsdown'
 
 // Read the manifest from cwd: the config file's own URL is not guaranteed to
@@ -55,128 +51,6 @@ const isProductionDependency = (specifier: string): boolean =>
 
 const NODE_ENV = process.env.NODE_ENV ?? 'production'
 
-// CSS channels, mirrored from packages/client/tsdown.client.ts. The virtual
-// ids must NOT end in `.css` — tsdown's own css-pipeline guard matches on that
-// suffix; the plugin's flat lc-* class namespace is the anti-collision rule.
-const CSS_VIRTUAL_PREFIX = '\0dsh-css:'
-const GLOBAL_CSS_VIRTUAL_PREFIX = '\0dsh-global-css:'
-const INLINE_CSS_VIRTUAL_PREFIX = '\0dsh-inline-css:'
-const CSS_VIRTUAL_SUFFIX = '.mjs'
-const INLINE_CSS_QUERY = '?inline'
-
-function styleInjectionModule(
-  id: string,
-  fileId: string,
-  css: string,
-  classMap?: Readonly<Record<string, string>>,
-): string {
-  const source = [
-    `const css = ${JSON.stringify(css)};`,
-    `const tagId = ${JSON.stringify(`${id}/${basename(fileId)}`)};`,
-    'if (typeof document !== \'undefined\' && document.querySelector(\'style[data-plugin-css=\' + JSON.stringify(tagId) + \']\') === null) {',
-    '  const tag = document.createElement(\'style\');',
-    `  tag.dataset.plugin = ${JSON.stringify(id)};`,
-    '  tag.dataset.pluginCss = tagId;',
-    '  tag.textContent = css;',
-    '  document.head.appendChild(tag);',
-    '}',
-  ]
-  source.push(classMap === undefined ? 'export {};' : `export default ${JSON.stringify(classMap)};`)
-  return source.join('\n')
-}
-
-function sourceAssetPath(source: string, importer: string): string {
-  return resolvePath(dirname(importer), source)
-}
-
-// The one sheet whose Tailwind utilities are compiled (src/client/styles/tailwind.css):
-// its @source directives name the scanned client sources, and the resolved sources
-// drive the oxide scanner here. Every other sheet stays plain CSS.
-const TAILWIND_ENTRY = 'tailwind.css'
-
-interface WatchCapable {
-  addWatchFile(file: string): void
-}
-
-async function compileTailwindSheet(loader: WatchCapable, fileId: string, source: string): Promise<string> {
-  const compiler = await compileTailwind(source, {
-    base: dirname(fileId),
-    onDependency: (file) => { loader.addWatchFile(file) },
-  })
-  const scanner = new Scanner({ sources: compiler.sources })
-  const candidates = scanner.scan()
-  // Scanned sources feed the candidates, so a watch rebuild must also fire when
-  // a component's class list changes, not just when a stylesheet does.
-  for (const file of scanner.files) loader.addWatchFile(file)
-  return compiler.build(candidates)
-}
-
-function cssChannels(id: string) {
-  return [{
-    name: 'dsh-css-modules-inline',
-    resolveId(source: string, importer: string | undefined) {
-      if (!source.endsWith('.module.css')) return null
-      const abs = importer !== undefined ? sourceAssetPath(source, importer) : source
-      return CSS_VIRTUAL_PREFIX + abs + CSS_VIRTUAL_SUFFIX
-    },
-    async load(this: { addWatchFile(file: string): void }, virtualId: string) {
-      if (!virtualId.startsWith(CSS_VIRTUAL_PREFIX)) return null
-      const fileId = virtualId.slice(CSS_VIRTUAL_PREFIX.length, -CSS_VIRTUAL_SUFFIX.length)
-      // The virtual id otherwise hides the physical stylesheet from the watch graph.
-      this.addWatchFile(fileId)
-      const source = await readFile(fileId)
-      const { code, exports: cssExports } = transform({
-        filename: fileId,
-        code: source,
-        cssModules: { pattern: '[hash]_[local]' },
-        minify: true,
-      })
-      const classMap: Record<string, string> = {}
-      const exportEntries = Object.entries(cssExports ?? {})
-        .sort(([left], [right]) => (left < right ? -1 : left > right ? 1 : 0))
-      for (const [local, exp] of exportEntries) classMap[local] = exp.name
-      return styleInjectionModule(id, fileId, code.toString(), classMap)
-    },
-  }, {
-    name: 'dsh-css-text-inline',
-    resolveId(source: string, importer: string | undefined) {
-      if (!source.endsWith(`.css${INLINE_CSS_QUERY}`)) return null
-      const stylesheet = source.slice(0, -INLINE_CSS_QUERY.length)
-      const abs = importer !== undefined ? sourceAssetPath(stylesheet, importer) : stylesheet
-      return INLINE_CSS_VIRTUAL_PREFIX + abs + CSS_VIRTUAL_SUFFIX
-    },
-    async load(this: { addWatchFile(file: string): void }, virtualId: string) {
-      if (!virtualId.startsWith(INLINE_CSS_VIRTUAL_PREFIX)) return null
-      const fileId = virtualId.slice(INLINE_CSS_VIRTUAL_PREFIX.length, -CSS_VIRTUAL_SUFFIX.length)
-      this.addWatchFile(fileId)
-      const source = await readFile(fileId)
-      const { code } = transform({ filename: fileId, code: source, minify: true })
-      return `export default ${JSON.stringify(code.toString())};`
-    },
-  }, {
-    name: 'dsh-css-global-inline',
-    resolveId(source: string, importer: string | undefined) {
-      if (!source.endsWith('.css') || source.endsWith('.module.css')) return null
-      const abs = importer !== undefined ? sourceAssetPath(source, importer) : source
-      return GLOBAL_CSS_VIRTUAL_PREFIX + abs + CSS_VIRTUAL_SUFFIX
-    },
-    async load(this: { addWatchFile(file: string): void }, virtualId: string) {
-      if (!virtualId.startsWith(GLOBAL_CSS_VIRTUAL_PREFIX)) return null
-      const fileId = virtualId.slice(GLOBAL_CSS_VIRTUAL_PREFIX.length, -CSS_VIRTUAL_SUFFIX.length)
-      this.addWatchFile(fileId)
-      const raw = await readFile(fileId)
-      // The Tailwind entry compiles to a CSS string first; every other sheet
-      // hands its Buffer straight to lightningcss. Either way the binding
-      // reads the TypedArray, so the code must never arrive as a string.
-      const code = basename(fileId) === TAILWIND_ENTRY
-        ? Buffer.from(await compileTailwindSheet(this, fileId, raw.toString()))
-        : raw
-      const { code: css } = transform({ filename: fileId, code, minify: true })
-      return styleInjectionModule(id, fileId, css.toString())
-    },
-  }]
-}
-
 export default defineConfig([
   {
     name: pkg.name,
@@ -186,8 +60,6 @@ export default defineConfig([
     platform: 'node',
     target: 'es2024',
     fixedExtension: false,
-    // The host half's Config/projection types are the integration contract
-    // other plugins and tooling compile against; ship them next to the JS.
     dts: true,
     clean: true,
     deps: {
@@ -220,10 +92,6 @@ export default defineConfig([
       'process.env.NODE_ENV': JSON.stringify(NODE_ENV),
       'import.meta.env.MODE': JSON.stringify(NODE_ENV),
       'import.meta.env': JSON.stringify({ MODE: NODE_ENV }),
-      __DSH_CTX_VERSION__: JSON.stringify(pkg.version),
-      __DSH_CTX_REPO__: JSON.stringify(
-        String((pkg.repository && pkg.repository.url) || '').replace(/^git\+/, '').replace(/\.git$/, ''),
-      ),
     },
     plugins: [{
       name: 'dsh-client-bundle-purity',      resolveId(source: string) {
@@ -237,7 +105,7 @@ export default defineConfig([
           + '(type-only imports are erased and never reach this gate)',
         )
       },
-    }, ...cssChannels(pkg.name)],
+    }],
     outputOptions: {
       entryFileNames: 'client.js',
       // The closure-factory handoff every `dsh.client` package's ./client
